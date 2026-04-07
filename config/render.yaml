@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: exam-app
+    env: php
+    buildCommand: |
+      composer install --no-dev --optimize-autoloader
+      php artisan config:cache
+      php artisan route:cache
+      php artisan view:cache
+      php artisan migrate --force
+      php artisan db:seed --force
+    startCommand: php artisan serve --host=0.0.0.0 --port=10000
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_KEY
+        generateValue: true
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        value: dpg-d7af1q0gjchc73bbmj20-a.oregon-postgres.render.com
+      - key: DB_PORT
+        value: 5432
+      - key: DB_DATABASE
+        value: exam_database_m5c1
+      - key: DB_USERNAME
+        value: exam_database_m5c1_user
+      - key: DB_PASSWORD
+        value: ZSOUxag6PxkDmCDMl6diwMKo13fJ6AcE
