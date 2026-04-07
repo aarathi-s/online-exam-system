@@ -51,6 +51,16 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 });
 
 
-
+Route::get('/create-student', function () {
+    $user = App\Models\User::firstOrCreate(
+        ['email' => 'student1@student.com'],
+        [
+            'name' => 'Student One',
+            'password' => 'student123',
+            'is_admin' => false,
+        ]
+    );
+    return 'Student created: ' . $user->email;
+});
 
 require __DIR__.'/auth.php';
