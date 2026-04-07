@@ -226,62 +226,50 @@ function autoSubmitExam() {
 
 // Violation detection
 let lastViolationTime = {};
-let isPageUnloading = false;
+//let isPageUnloading = false;
 
 function setupViolationDetection() {
-    // Track page unload to prevent recording violations during navigation
-    window.addEventListener('beforeunload', function() {
-        isPageUnloading = true;
-    });
-    
-    // Detect tab switch - only if hidden for more than 2 seconds
     let hiddenTimeout;
+
+    // Tab switch detection (no beforeunload interference)
     document.addEventListener('visibilitychange', function() {
         clearTimeout(hiddenTimeout);
-        
-        if (document.hidden && !isPageUnloading) {
-            // Wait 2 seconds to confirm it's a real tab switch (not just a momentary visibility change)
+
+        if (document.hidden) {
             hiddenTimeout = setTimeout(() => {
-                // Debounce: only record if last violation was more than 5 seconds ago
                 if (!lastViolationTime['tab_switch'] || Date.now() - lastViolationTime['tab_switch'] > 5000) {
                     lastViolationTime['tab_switch'] = Date.now();
                     recordViolation('tab_switch');
                 }
-            }, 2000);
+            }, 500);
         }
     });
-    
-    // Detect right click
+
+    // Right click
     document.addEventListener('contextmenu', function(e) {
         e.preventDefault();
-        // Debounce: prevent multiple right clicks from registering as separate violations
         if (!lastViolationTime['right_click'] || Date.now() - lastViolationTime['right_click'] > 2000) {
             lastViolationTime['right_click'] = Date.now();
             recordViolation('right_click');
         }
         return false;
     });
-    
-    // Detect copy/paste
+
+    // Copy
     document.addEventListener('copy', function(e) {
-        if (!isPageUnloading) {
-            e.preventDefault();
-            if (!lastViolationTime['copy_paste'] || Date.now() - lastViolationTime['copy_paste'] > 2000) {
-                lastViolationTime['copy_paste'] = Date.now();
-                recordViolation('copy_paste');
-            }
-            return false;
+        e.preventDefault();
+        if (!lastViolationTime['copy_paste'] || Date.now() - lastViolationTime['copy_paste'] > 2000) {
+            lastViolationTime['copy_paste'] = Date.now();
+            recordViolation('copy_paste');
         }
     });
-    
+
+    // Paste
     document.addEventListener('paste', function(e) {
-        if (!isPageUnloading) {
-            e.preventDefault();
-            if (!lastViolationTime['copy_paste'] || Date.now() - lastViolationTime['copy_paste'] > 2000) {
-                lastViolationTime['copy_paste'] = Date.now();
-                recordViolation('copy_paste');
-            }
-            return false;
+        e.preventDefault();
+        if (!lastViolationTime['copy_paste'] || Date.now() - lastViolationTime['copy_paste'] > 2000) {
+            lastViolationTime['copy_paste'] = Date.now();
+            recordViolation('copy_paste');
         }
     });
 }
