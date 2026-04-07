@@ -102,7 +102,7 @@ class ExamController extends Controller
             return redirect()->route('student.result', $session->id);
         }
 
-        $session->load('exam.questions.options', 'answers');
+        $session->load('exam.questions.options', 'answers.option');
         $score = 0;
 
         foreach ($session->exam->questions as $question) {
