@@ -63,4 +63,6 @@ Route::get('/create-student', function () {
     return 'Student created: ' . $user->email;
 });
 
+Route::get('/test-db', [ExamController::class, 'testDB']);
+
 require __DIR__.'/auth.php';

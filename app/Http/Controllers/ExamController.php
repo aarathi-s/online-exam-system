@@ -1,6 +1,10 @@
 <?php
 namespace App\Http\Controllers;
 
+
+use Illuminate\Support\Facades\DB;
+
+
 use App\Models\Exam;
 use App\Models\ExamSession;
 use App\Models\Answer;
@@ -108,9 +112,9 @@ class ExamController extends Controller
         foreach ($session->exam->questions as $question) {
             $answer = $session->answers->where('question_id', $question->id)->first();
             if ($answer && $answer->option) {
-                if ((bool) $answer->option->is_correct) {
-                    $score++;
-                }
+                if ((int) $answer->option->is_correct === 1) {
+                $score++;
+            }
             }
         }
 
@@ -149,4 +153,12 @@ class ExamController extends Controller
 
         return response()->json(['status' => 'recorded', 'violations' => $violationCount]);
     }
+
+
+
+    public function testDB() {
+    dd(DB::table('answers')->get());
+}
+
+
 }

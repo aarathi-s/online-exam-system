@@ -12,8 +12,8 @@ class Option extends Model
      * Casting to boolean ensures it works correctly in both SQLite and PostgreSQL.
      */
     protected $casts = [
-        'is_correct' => 'boolean',
-    ];
+    'is_correct' => 'integer',
+];
 
     public function question() {
         return $this->belongsTo(Question::class);
