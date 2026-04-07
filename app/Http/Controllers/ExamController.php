@@ -108,7 +108,9 @@ class ExamController extends Controller
         foreach ($session->exam->questions as $question) {
             $answer = $session->answers->where('question_id', $question->id)->first();
             if ($answer && $answer->option) {
-                if ($answer->option->is_correct) $score++;
+                if ((bool) $answer->option->is_correct) {
+                    $score++;
+                }
             }
         }
 
@@ -125,6 +127,13 @@ class ExamController extends Controller
         $session = ExamSession::findOrFail($sessionId);
         if ($session->user_id !== Auth::id()) abort(403);
 
+
+         // Only record if exam is still in progress
+        if ($session->status === 'submitted') {
+            return response()->json(['status' => 'already_submitted']);
+        }
+ 
+        
         Violation::create([
             'exam_session_id' => $sessionId,
             'type' => $request->type,

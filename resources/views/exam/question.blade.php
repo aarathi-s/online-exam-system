@@ -9,8 +9,9 @@
 </head>
 <body class="bg-gray-100 min-h-screen" id="exam-body">
 
-<div id="violation-banner" class="hidden bg-red-600 text-white text-center py-2 text-sm font-semibold"></div>
-
+<div id="violation-banner" class="hidden fixed top-0 left-0 right-0 z-50 bg-red-600 text-white text-center py-3 text-sm font-semibold shadow-lg">
+    <span id="violation-message"></span>
+</div>
 <div class="max-w-3xl mx-auto px-4 py-6">
     <!-- Header -->
     <div class="bg-white rounded-lg shadow p-4 mb-4 flex justify-between items-center">
@@ -108,44 +109,41 @@
 </div>
 
 <script>
-// Initialize
+let violationCount = 0;
+const MAX_VIOLATIONS = 3;
+let lastViolationTime = {};
+let saveToastTimer = null;
+
 document.addEventListener('DOMContentLoaded', function() {
-    // Ensure modal is hidden on page load
     document.getElementById('confirm-modal').classList.add('hidden');
-    
     startTimer();
     saveAnswerOnChange();
     setupViolationDetection();
 });
 
-// Timer function
+// ─── Timer ───────────────────────────────────────────────
 function startTimer() {
-    const remaining = Math.floor({{ $remaining }});
-    let seconds = remaining;
+    let seconds = Math.floor({{ $remaining }});
 
     function updateTimer() {
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const secs = seconds % 60;
-        
-        const timeStr = String(hours).padStart(2, '0') + ':' +
-                       String(minutes).padStart(2, '0') + ':' +
-                       String(secs).padStart(2, '0');
-        
-        document.getElementById('timer').textContent = timeStr;
-        
-        // Warning colors
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        const timerEl = document.getElementById('timer');
+        timerEl.textContent =
+            String(h).padStart(2,'0') + ':' +
+            String(m).padStart(2,'0') + ':' +
+            String(s).padStart(2,'0');
+
         if (seconds <= 60) {
-            document.getElementById('timer').classList.add('text-red-600');
-            document.getElementById('timer').classList.remove('text-blue-600');
+            timerEl.classList.add('text-red-600');
+            timerEl.classList.remove('text-blue-600');
         }
-        
         if (seconds <= 0) {
-            document.getElementById('timer').textContent = '00:00:00';
+            timerEl.textContent = '00:00:00';
             autoSubmitExam();
             return;
         }
-        
         seconds--;
     }
 
@@ -153,27 +151,15 @@ function startTimer() {
     setInterval(updateTimer, 1000);
 }
 
-// Save answer on radio change
+// ─── Save Answer ──────────────────────────────────────────
 function saveAnswerOnChange() {
-    const optionsDiv = document.getElementById('options');
-    if (!optionsDiv) return;
-    
-    const radios = optionsDiv.querySelectorAll('input[type="radio"]');
+    const radios = document.querySelectorAll('#options input[type="radio"]');
     radios.forEach(radio => {
         radio.addEventListener('change', function() {
             const optionId = this.value;
-            const sessionId = '{{ $session->id }}';
-            const questionId = '{{ $question->id }}';
-            
-            // Show visual feedback that answer is being saved
-            const parentLabel = this.closest('label');
-            if (parentLabel) {
-                parentLabel.style.opacity = '0.6';
-            }
-            
-            fetch('{{ route("exam.answer", ["sessionId" => ":sessionId", "questionId" => ":questionId"]) }}'
-                .replace(':sessionId', sessionId)
-                .replace(':questionId', questionId), {
+            fetch('{{ route("exam.answer", ["sessionId" => ":sid", "questionId" => ":qid"]) }}'
+                .replace(':sid', '{{ $session->id }}')
+                .replace(':qid', '{{ $question->id }}'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -181,63 +167,57 @@ function saveAnswerOnChange() {
                 },
                 body: JSON.stringify({ option_id: optionId })
             })
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
-                if (data.status === 'saved') {
-                    // Just update styling, don't reload page
-                    if (parentLabel) {
-                        parentLabel.style.opacity = '1';
-                    }
-                    showViolationBanner('Answer saved ✓');
-                }
+                if (data.status === 'saved') showSaveToast();
             })
-            .catch(error => {
-                console.error('Error:', error);
-                if (parentLabel) {
-                    parentLabel.style.opacity = '1';
-                }
-            });
+            .catch(console.error);
         });
     });
 }
 
-// Confirm submit
+// ─── Save Toast (separate from violation banner) ──────────
+function showSaveToast() {
+    const toast = document.getElementById('save-toast');
+    toast.classList.remove('hidden');
+    clearTimeout(saveToastTimer);
+    saveToastTimer = setTimeout(() => toast.classList.add('hidden'), 2000);
+}
+
+// ─── Violation Banner (persistent until next action) ──────
+function showViolationBanner(message, autoHide = false) {
+    const banner = document.getElementById('violation-banner');
+    const msg    = document.getElementById('violation-message');
+    msg.textContent = message;
+    banner.classList.remove('hidden');
+    if (autoHide) {
+        setTimeout(() => banner.classList.add('hidden'), 5000);
+    }
+}
+
+// ─── Modal ────────────────────────────────────────────────
 function confirmSubmit() {
     document.getElementById('confirm-modal').classList.remove('hidden');
 }
-
-// Close modal
 function closeModal() {
     document.getElementById('confirm-modal').classList.add('hidden');
 }
-
-// Submit exam
 function submitExam() {
     document.getElementById('submit-form').submit();
 }
-
-// Auto submit (time's up)
 function autoSubmitExam() {
-    showViolationBanner('Time is up! Your exam has been automatically submitted.');
-    setTimeout(() => {
-        document.getElementById('submit-form').submit();
-    }, 2000);
+    showViolationBanner('⏰ Time is up! Submitting your exam...');
+    setTimeout(() => document.getElementById('submit-form').submit(), 2000);
 }
 
-// Violation detection
-let lastViolationTime = {};
-//let isPageUnloading = false;
-
+// ─── Violation Detection ──────────────────────────────────
 function setupViolationDetection() {
-    let hiddenTimeout;
-
-    // Tab switch detection (no beforeunload interference)
+    // Tab switch
     document.addEventListener('visibilitychange', function() {
-        clearTimeout(hiddenTimeout);
-
         if (document.hidden) {
-            hiddenTimeout = setTimeout(() => {
-                if (!lastViolationTime['tab_switch'] || Date.now() - lastViolationTime['tab_switch'] > 5000) {
+            setTimeout(() => {
+                if (!lastViolationTime['tab_switch'] ||
+                    Date.now() - lastViolationTime['tab_switch'] > 5000) {
                     lastViolationTime['tab_switch'] = Date.now();
                     recordViolation('tab_switch');
                 }
@@ -248,38 +228,30 @@ function setupViolationDetection() {
     // Right click
     document.addEventListener('contextmenu', function(e) {
         e.preventDefault();
-        if (!lastViolationTime['right_click'] || Date.now() - lastViolationTime['right_click'] > 2000) {
+        if (!lastViolationTime['right_click'] ||
+            Date.now() - lastViolationTime['right_click'] > 2000) {
             lastViolationTime['right_click'] = Date.now();
             recordViolation('right_click');
         }
-        return false;
     });
 
-    // Copy
-    document.addEventListener('copy', function(e) {
-        e.preventDefault();
-        if (!lastViolationTime['copy_paste'] || Date.now() - lastViolationTime['copy_paste'] > 2000) {
-            lastViolationTime['copy_paste'] = Date.now();
-            recordViolation('copy_paste');
-        }
-    });
-
-    // Paste
-    document.addEventListener('paste', function(e) {
-        e.preventDefault();
-        if (!lastViolationTime['copy_paste'] || Date.now() - lastViolationTime['copy_paste'] > 2000) {
-            lastViolationTime['copy_paste'] = Date.now();
-            recordViolation('copy_paste');
-        }
+    // Copy / Paste
+    ['copy','paste'].forEach(evt => {
+        document.addEventListener(evt, function(e) {
+            e.preventDefault();
+            if (!lastViolationTime['copy_paste'] ||
+                Date.now() - lastViolationTime['copy_paste'] > 2000) {
+                lastViolationTime['copy_paste'] = Date.now();
+                recordViolation('copy_paste');
+            }
+        });
     });
 }
 
-// Record violation
+// ─── Record Violation via API ─────────────────────────────
 function recordViolation(type) {
-    const sessionId = '{{ $session->id }}';
-    
-    fetch('{{ route("exam.violation", ["sessionId" => ":sessionId"]) }}'
-        .replace(':sessionId', sessionId), {
+    fetch('{{ route("exam.violation", ["sessionId" => ":sid"]) }}'
+        .replace(':sid', '{{ $session->id }}'), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -287,28 +259,46 @@ function recordViolation(type) {
         },
         body: JSON.stringify({ type: type })
     })
-    .then(response => response.json())
+    .then(r => r.json())
     .then(data => {
         if (data.status === 'terminated') {
-            showViolationBanner(data.message);
-            setTimeout(() => {
-                document.getElementById('submit-form').submit();
-            }, 2000);
+            // Full red screen lockout
+            document.body.innerHTML = `
+                <div style="position:fixed;inset:0;background:#dc2626;color:white;
+                    display:flex;flex-direction:column;align-items:center;
+                    justify-content:center;z-index:9999;font-family:sans-serif;">
+                    <div style="font-size:4rem;">🚫</div>
+                    <h1 style="font-size:2rem;font-weight:bold;margin:1rem 0;">Exam Terminated</h1>
+                    <p style="font-size:1.1rem;opacity:0.9;">Too many violations detected. Your exam has been submitted.</p>
+                    <p style="margin-top:0.5rem;opacity:0.7;">Redirecting...</p>
+                </div>`;
+            setTimeout(() => document.getElementById('submit-form')?.submit(), 2500);
         } else if (data.status === 'recorded') {
-            showViolationBanner(`Violation recorded (${data.violations}/3). Your exam will be terminated after 3 violations.`);
+            violationCount = data.violations;
+            const remaining = MAX_VIOLATIONS - violationCount;
+
+            // Shake the page briefly
+            document.body.style.animation = 'none';
+
+            const typeLabel = {
+                'tab_switch' : '⚠️ Tab switch detected!',
+                'right_click': '⚠️ Right-click detected!',
+                'copy_paste' : '⚠️ Copy/Paste detected!'
+            }[type] || '⚠️ Violation detected!';
+
+            showViolationBanner(
+                `${typeLabel} — Violation ${violationCount}/${MAX_VIOLATIONS}. ` +
+                (remaining > 0
+                    ? `${remaining} more will auto-submit your exam.`
+                    : `Submitting now...`)
+            );
+
+            if (violationCount >= MAX_VIOLATIONS) {
+                setTimeout(() => document.getElementById('submit-form').submit(), 2500);
+            }
         }
     })
-    .catch(error => console.error('Error:', error));
-}
-
-// Show violation banner
-function showViolationBanner(message) {
-    const banner = document.getElementById('violation-banner');
-    banner.textContent = message;
-    banner.classList.remove('hidden');
-    setTimeout(() => {
-        banner.classList.add('hidden');
-    }, 5000);
+    .catch(console.error);
 }
 </script>
 
