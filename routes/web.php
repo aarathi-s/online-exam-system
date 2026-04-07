@@ -50,4 +50,24 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::delete('/exams/{examId}', [AdminController::class, 'deleteExam'])->name('exam.delete');
 });
 
+Route::get('/create-admin', function () {
+    $user = App\Models\User::create([
+        'name' => 'Admin',
+        'email' => 'admin@admin.com',
+        'password' => 'admin123',
+        'is_admin' => true,
+    ]);
+    return 'Admin created: ' . $user->email;
+});
+
+Route::get('/create-student', function () {
+    $user = App\Models\User::create([
+        'name' => 'Student',
+        'email' => 'student@student.com',
+        'password' => 'student123',
+        'is_admin' => false,
+    ]);
+    return 'Student created: ' . $user->email;
+});
+
 require __DIR__.'/auth.php';
