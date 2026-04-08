@@ -12,6 +12,12 @@
 <div id="violation-banner" class="hidden fixed top-0 left-0 right-0 z-50 bg-red-600 text-white text-center py-3 text-sm font-semibold shadow-lg">
     <span id="violation-message"></span>
 </div>
+
+{{-- Save toast (was missing from original) --}}
+<div id="save-toast" class="hidden fixed bottom-4 right-4 z-50 bg-green-600 text-white text-sm px-4 py-2 rounded shadow-lg">
+    ✓ Answer saved
+</div>
+
 <div class="max-w-3xl mx-auto px-4 py-6">
     <!-- Header -->
     <div class="bg-white rounded-lg shadow p-4 mb-4 flex justify-between items-center">
@@ -67,14 +73,15 @@
     <!-- Navigation -->
     <div class="flex justify-between">
         @if($questionIndex > 0)
-            <a href="{{ route('exam.question', ['sessionId' => $session->id, 'questionId' => $questions[$questionIndex - 1]->id]) }}"
+            {{-- Fix: use ->get() instead of [] for PostgreSQL compatibility --}}
+            <a href="{{ route('exam.question', ['sessionId' => $session->id, 'questionId' => $questions->get($questionIndex - 1)->id]) }}"
                class="bg-gray-200 text-gray-700 px-6 py-2 rounded hover:bg-gray-300">← Previous</a>
         @else
             <div></div>
         @endif
 
         @if($questionIndex < $questions->count() - 1)
-            <a href="{{ route('exam.question', ['sessionId' => $session->id, 'questionId' => $questions[$questionIndex + 1]->id]) }}"
+            <a href="{{ route('exam.question', ['sessionId' => $session->id, 'questionId' => $questions->get($questionIndex + 1)->id]) }}"
                class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">Next →</a>
         @else
             <button onclick="confirmSubmit()"
@@ -121,7 +128,6 @@ document.addEventListener('DOMContentLoaded', function() {
     setupViolationDetection();
 });
 
-// ─── Timer ───────────────────────────────────────────────
 function startTimer() {
     let seconds = Math.floor({{ $remaining }});
 
@@ -151,13 +157,11 @@ function startTimer() {
     setInterval(updateTimer, 1000);
 }
 
-// ─── Save Answer ──────────────────────────────────────────
 function saveAnswerOnChange() {
     const radios = document.querySelectorAll('#options input[type="radio"]');
     radios.forEach(radio => {
         radio.addEventListener('change', function() {
             const optionId = this.value;
-
             const formData = new FormData();
             formData.append('option_id', optionId);
 
@@ -173,14 +177,13 @@ function saveAnswerOnChange() {
             .then(res => res.json())
             .then(data => {
                 console.log(data);
-                showSaveToast(); // optional UI
+                showSaveToast();
             })
             .catch(err => console.error(err));
         });
     });
 }
 
-// ─── Save Toast (separate from violation banner) ──────────
 function showSaveToast() {
     const toast = document.getElementById('save-toast');
     toast.classList.remove('hidden');
@@ -188,7 +191,6 @@ function showSaveToast() {
     saveToastTimer = setTimeout(() => toast.classList.add('hidden'), 2000);
 }
 
-// ─── Violation Banner (persistent until next action) ──────
 function showViolationBanner(message, autoHide = false) {
     const banner = document.getElementById('violation-banner');
     const msg    = document.getElementById('violation-message');
@@ -199,7 +201,6 @@ function showViolationBanner(message, autoHide = false) {
     }
 }
 
-// ─── Modal ────────────────────────────────────────────────
 function confirmSubmit() {
     document.getElementById('confirm-modal').classList.remove('hidden');
 }
@@ -214,9 +215,7 @@ function autoSubmitExam() {
     setTimeout(() => document.getElementById('submit-form').submit(), 2000);
 }
 
-// ─── Violation Detection ──────────────────────────────────
 function setupViolationDetection() {
-    // Tab switch
     document.addEventListener('visibilitychange', function() {
         if (document.hidden) {
             setTimeout(() => {
@@ -229,7 +228,6 @@ function setupViolationDetection() {
         }
     });
 
-    // Right click
     document.addEventListener('contextmenu', function(e) {
         e.preventDefault();
         if (!lastViolationTime['right_click'] ||
@@ -239,7 +237,6 @@ function setupViolationDetection() {
         }
     });
 
-    // Copy / Paste
     ['copy','paste'].forEach(evt => {
         document.addEventListener(evt, function(e) {
             e.preventDefault();
@@ -252,7 +249,7 @@ function setupViolationDetection() {
     });
 }
 
-// ─── Record Violation via API ─────────────────────────────
+// ── FIXED: single complete fetch chain ────────────────────
 function recordViolation(type) {
     const formData = new FormData();
     formData.append('type', type);
@@ -267,14 +264,7 @@ function recordViolation(type) {
     })
     .then(r => r.json())
     .then(data => {
-        console.log(data);
-    })
-    .catch(console.error);
-}
-    .then(r => r.json())
-    .then(data => {
         if (data.status === 'terminated') {
-            // Full red screen lockout
             document.body.innerHTML = `
                 <div style="position:fixed;inset:0;background:#dc2626;color:white;
                     display:flex;flex-direction:column;align-items:center;
@@ -288,9 +278,6 @@ function recordViolation(type) {
         } else if (data.status === 'recorded') {
             violationCount = data.violations;
             const remaining = MAX_VIOLATIONS - violationCount;
-
-            // Shake the page briefly
-            document.body.style.animation = 'none';
 
             const typeLabel = {
                 'tab_switch' : '⚠️ Tab switch detected!',
