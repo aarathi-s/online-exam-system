@@ -157,21 +157,25 @@ function saveAnswerOnChange() {
     radios.forEach(radio => {
         radio.addEventListener('change', function() {
             const optionId = this.value;
+
+            const formData = new FormData();
+            formData.append('option_id', optionId);
+
             fetch('{{ route("exam.answer", ["sessionId" => ":sid", "questionId" => ":qid"]) }}'
                 .replace(':sid', '{{ $session->id }}')
                 .replace(':qid', '{{ $question->id }}'), {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                 },
-                body: JSON.stringify({ option_id: optionId })
+                body: formData
             })
-            .then(r => r.json())
+            .then(res => res.json())
             .then(data => {
-                if (data.status === 'saved') showSaveToast();
+                console.log(data);
+                showSaveToast(); // optional UI
             })
-            .catch(console.error);
+            .catch(err => console.error(err));
         });
     });
 }
@@ -250,15 +254,23 @@ function setupViolationDetection() {
 
 // ─── Record Violation via API ─────────────────────────────
 function recordViolation(type) {
+    const formData = new FormData();
+    formData.append('type', type);
+
     fetch('{{ route("exam.violation", ["sessionId" => ":sid"]) }}'
         .replace(':sid', '{{ $session->id }}'), {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
         },
-        body: JSON.stringify({ type: type })
+        body: formData
     })
+    .then(r => r.json())
+    .then(data => {
+        console.log(data);
+    })
+    .catch(console.error);
+}
     .then(r => r.json())
     .then(data => {
         if (data.status === 'terminated') {

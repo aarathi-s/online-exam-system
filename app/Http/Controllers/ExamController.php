@@ -79,18 +79,37 @@ class ExamController extends Controller
     ));
 }
 
-    public function saveAnswer(Request $request, $sessionId, $questionId) {
-        $session = ExamSession::findOrFail($sessionId);
-        if ($session->user_id !== Auth::id()) abort(403);
-        if ($session->status === 'submitted') return response()->json(['status' => 'already_submitted']);
+    public function saveAnswer(Request $request, $sessionId, $questionId)
+{
+    $session = ExamSession::findOrFail($sessionId);
 
-        Answer::updateOrCreate(
-            ['exam_session_id' => $sessionId, 'question_id' => $questionId],
-            ['option_id' => $request->option_id]
-        );
+    if ($session->user_id !== Auth::id()) abort(403);
 
-        return response()->json(['status' => 'saved']);
+    if ($session->status === 'submitted') {
+        return response()->json(['status' => 'already_submitted']);
     }
+
+    // ✅ VALIDATION (VERY IMPORTANT)
+    $request->validate([
+        'option_id' => 'required|exists:options,id',
+    ]);
+
+    // ✅ SAFE INPUT FETCH
+    $optionId = $request->input('option_id');
+
+    // ✅ SAVE
+    Answer::updateOrCreate(
+        [
+            'exam_session_id' => $sessionId,
+            'question_id' => $questionId
+        ],
+        [
+            'option_id' => $optionId
+        ]
+    );
+
+    return response()->json(['status' => 'saved']);
+}
 
     public function submit(Request $request, $sessionId) {
         $session = ExamSession::with('exam.questions.options', 'answers')->findOrFail($sessionId);
@@ -111,11 +130,10 @@ class ExamController extends Controller
 
         foreach ($session->exam->questions as $question) {
             $answer = $session->answers->where('question_id', $question->id)->first();
-            if ($answer && $answer->option) {
-                if ((int) $answer->option->is_correct === 1) {
-                $score++;
-            }
-            }
+            if ($answer && $answer->option && (int)$answer->option->is_correct === 1) {
+            $score++;
+        }
+            
         }
 
         $session->update([
