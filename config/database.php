@@ -182,3 +182,9 @@ return [
     ],
 
 ];
+
+/*
+    admin email: admin@admin.com
+    admin password: admin123
+*/
+
